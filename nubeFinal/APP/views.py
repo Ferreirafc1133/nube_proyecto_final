@@ -5,7 +5,7 @@ import boto3
 import uuid
 from decimal import Decimal
 
-dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 muebles_table = dynamodb.Table('Muebles')
 
 @csrf_exempt
