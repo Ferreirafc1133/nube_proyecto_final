@@ -13,20 +13,20 @@ BUCKET_NAME = 'practicafinal13'
 @csrf_exempt
 def crear_mueble(request):
     if request.method == 'POST':
-        mueble_id = str(uuid.uuid4())
         nombre = request.POST.get('nombre')
         descripcion = request.POST.get('descripcion')
-        precio = Decimal(str(request.POST.get('precio')))
+        precio = Decimal(request.POST.get('precio'))
         stock = int(request.POST.get('stock'))
-        foto = request.FILES.get('foto') 
-
-        if foto:
-            foto_key = f"muebles/{mueble_id}/{foto.name}"
-            s3_client.upload_fileobj(foto, BUCKET_NAME, foto_key, ExtraArgs={'ACL': 'public-read'})
-            foto_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{foto_key}"
+        
+        archivo_imagen = request.FILES.get('foto')
+        if archivo_imagen:
+            s3_key = f"muebles/{uuid.uuid4()}_{archivo_imagen.name}"
+            s3_client.upload_fileobj(archivo_imagen, BUCKET_NAME, s3_key)
+            foto_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
         else:
-            foto_url = None
+            return JsonResponse({'error': 'Imagen requerida'}, status=400)
 
+        mueble_id = str(uuid.uuid4())
         muebles_table.put_item(Item={
             'mueble_id': mueble_id,
             'nombre': nombre,
