@@ -7,17 +7,25 @@ from decimal import Decimal
 
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 muebles_table = dynamodb.Table('Muebles')
+s3_client = boto3.client('s3')
+BUCKET_NAME = 'practicafinal13'
 
 @csrf_exempt
 def crear_mueble(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        mueble_id = data.get('mueble_id', str(uuid.uuid4()))
-        nombre = data.get('nombre')
-        descripcion = data.get('descripcion')
-        precio = Decimal(str(data.get('precio')))
-        stock = int(data.get('stock'))
-        foto_url = data.get('foto_url')
+        mueble_id = str(uuid.uuid4())
+        nombre = request.POST.get('nombre')
+        descripcion = request.POST.get('descripcion')
+        precio = Decimal(str(request.POST.get('precio')))
+        stock = int(request.POST.get('stock'))
+        foto = request.FILES.get('foto') 
+
+        if foto:
+            foto_key = f"muebles/{mueble_id}/{foto.name}"
+            s3_client.upload_fileobj(foto, BUCKET_NAME, foto_key, ExtraArgs={'ACL': 'public-read'})
+            foto_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{foto_key}"
+        else:
+            foto_url = None
 
         muebles_table.put_item(Item={
             'mueble_id': mueble_id,
@@ -27,8 +35,8 @@ def crear_mueble(request):
             'stock': stock,
             'foto_url': foto_url
         })
-        return JsonResponse({'message': 'Mueble creado exitosamente', 'mueble_id': mueble_id}, status=201)
 
+        return JsonResponse({'message': 'Mueble creado exitosamente', 'mueble_id': mueble_id, 'foto_url': foto_url}, status=201)
 @csrf_exempt
 def obtener_muebles(request):
     if request.method == 'GET':
