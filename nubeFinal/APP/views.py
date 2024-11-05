@@ -3,6 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 import boto3
 import uuid
+from decimal import Decimal
 
 dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
 muebles_table = dynamodb.Table('Muebles')
@@ -14,7 +15,7 @@ def crear_mueble(request):
         mueble_id = data.get('mueble_id', str(uuid.uuid4()))
         nombre = data.get('nombre')
         descripcion = data.get('descripcion')
-        precio = float(data.get('precio'))
+        precio = Decimal(str(data.get('precio')))
         stock = int(data.get('stock'))
         foto_url = data.get('foto_url')
 
