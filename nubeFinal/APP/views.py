@@ -7,9 +7,15 @@ from decimal import Decimal
 
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 muebles_table = dynamodb.Table('Muebles')
+clientes_table = dynamodb.Table('Clientes')
 s3_client = boto3.client('s3')
+sns_client = boto3.client('sns', region_name='us-east-1')
 BUCKET_NAME = 'practicafinal13'
 
+# Configuración del tópico SNS
+SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:123456789012:ClientesNotificaciones'  # Reemplazar con el ARN real
+
+#MUEBLES
 @csrf_exempt
 def crear_mueble(request):
     if request.method == 'POST':
@@ -82,3 +88,106 @@ def eliminar_mueble(request, mueble_id):
     if request.method == 'DELETE':
         muebles_table.delete_item(Key={'mueble_id': mueble_id})
         return JsonResponse({'message': 'Mueble eliminado exitosamente'})
+
+#CLIENTES    
+@csrf_exempt
+def crear_cliente(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            cliente_id = str(uuid.uuid4())
+            cliente = {
+                'cliente_id': cliente_id,
+                'nombre': data.get('nombre'),
+                'email': data.get('email'),
+                'telefono': data.get('telefono'),
+                'direccion': data.get('direccion')
+            }
+            clientes_table.put_item(Item=cliente)
+            return JsonResponse({'message': 'Cliente creado exitosamente', 'cliente_id': cliente_id}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def obtener_clientes(request):
+    if request.method == 'GET':
+        try:
+            response = clientes_table.scan()
+            clientes = response.get('Items', [])
+            return JsonResponse(clientes, safe=False, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def obtener_cliente(request, cliente_id):
+    if request.method == 'GET':
+        try:
+            response = clientes_table.get_item(Key={'cliente_id': cliente_id})
+            cliente = response.get('Item')
+            if cliente:
+                return JsonResponse(cliente, status=200)
+            else:
+                return JsonResponse({'error': 'Cliente no encontrado'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def actualizar_cliente(request, cliente_id):
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            atributos = {key: {'Value': value, 'Action': 'PUT'} for key, value in data.items()}
+            clientes_table.update_item(
+                Key={'cliente_id': cliente_id},
+                AttributeUpdates=atributos
+            )
+            return JsonResponse({'message': 'Cliente actualizado exitosamente'}, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def eliminar_cliente(request, cliente_id):
+    if request.method == 'DELETE':
+        try:
+            clientes_table.delete_item(Key={'cliente_id': cliente_id})
+            return JsonResponse({'message': 'Cliente eliminado exitosamente'}, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+# Notificaciones con SNS
+@csrf_exempt
+def enviar_notificacion(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            mensaje = data.get('mensaje')
+            asunto = data.get('asunto', 'Notificación de Casa Diana')
+
+            response = sns_client.publish(
+                TopicArn=SNS_TOPIC_ARN,
+                Message=mensaje,
+                Subject=asunto
+            )
+            return JsonResponse({'message': 'Notificación enviada', 'response': response}, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def suscribir_cliente(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            protocolo = data.get('protocolo')  # "email" o "sms"
+            endpoint = data.get('endpoint')
+
+            if protocolo not in ['email', 'sms'] or not endpoint:
+                return JsonResponse({'error': 'Protocolo o endpoint inválido'}, status=400)
+
+            response = sns_client.subscribe(
+                TopicArn=SNS_TOPIC_ARN,
+                Protocol=protocolo,
+                Endpoint=endpoint
+            )
+            return JsonResponse({'message': 'Suscripción exitosa', 'response': response}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
